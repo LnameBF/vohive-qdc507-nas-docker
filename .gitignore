@@ -1,0 +1,17 @@
+# Proprietary application payloads and locally built artifacts
+vendor/vohive
+*.tar
+*.zip
+*.qcow2
+*.img
+
+# Runtime state and secrets
+runtime/
+.env
+config.yaml
+*.log
+
+# OS/editor files
+.DS_Store
+Thumbs.db
+.vscode/

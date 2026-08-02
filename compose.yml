@@ -1,0 +1,16 @@
+services:
+  vohive:
+    build: .
+    image: local/vohive-qdc507:local
+    container_name: vohive-qdc507
+    restart: unless-stopped
+    privileged: true
+    network_mode: host
+    volumes:
+      # Dynamic QMI and serial nodes must remain visible after USB hot-plug.
+      - /dev:/dev
+      # The recovery routine safely rebinds only the QDC507 QMI interface.
+      - /sys:/sys:rw
+      - /lib/modules:/lib/modules:ro
+      - ./runtime/data:/opt/vohive/data
+      - ./runtime/logs:/opt/vohive/logs

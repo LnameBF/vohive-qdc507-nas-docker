@@ -1,0 +1,19 @@
+# Optional sidecar for UGREEN NAS Quick Access.
+# Start VoHive with compose.yml first.  This bridge-mode proxy exposes only
+# the web UI while the modem-facing VoHive container remains in host mode.
+services:
+  vohive-ugreenlink:
+    image: caddy:2-alpine
+    container_name: vohive-ugreenlink
+    restart: unless-stopped
+    ports:
+      - "37953:80"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    entrypoint: ["caddy"]
+    command:
+      - reverse-proxy
+      - --from
+      - ":80"
+      - --to
+      - "host.docker.internal:7575"
