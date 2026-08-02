@@ -1,0 +1,37 @@
+name: Build Docker release image
+
+on:
+  workflow_dispatch:
+    inputs:
+      image_tag:
+        description: Docker image tag
+        required: true
+        default: 0.2.0
+
+permissions:
+  contents: read
+
+jobs:
+  build-amd64-image:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+
+      - name: Build the deployment image from source
+        run: docker build --pull --tag local/vohive-qdc507:${{ inputs.image_tag }} .
+
+      - name: Export a NAS-importable image archive
+        run: |
+          docker save --output vohive-qdc507-${{ inputs.image_tag }}-amd64.tar local/vohive-qdc507:${{ inputs.image_tag }}
+          sha256sum vohive-qdc507-${{ inputs.image_tag }}-amd64.tar > SHA256SUMS.txt
+
+      - name: Upload release-ready artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: vohive-qdc507-${{ inputs.image_tag }}-amd64
+          if-no-files-found: error
+          path: |
+            vohive-qdc507-${{ inputs.image_tag }}-amd64.tar
+            SHA256SUMS.txt
+          retention-days: 30

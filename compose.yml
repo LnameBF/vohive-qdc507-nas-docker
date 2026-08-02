@@ -1,7 +1,7 @@
 services:
   vohive:
     build: .
-    image: local/vohive-qdc507:local
+    image: local/vohive-qdc507:0.2.0
     container_name: vohive-qdc507
     restart: unless-stopped
     privileged: true

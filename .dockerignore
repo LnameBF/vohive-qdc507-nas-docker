@@ -1,0 +1,8 @@
+.git
+.github
+runtime
+*.tar
+*.zip
+*.qcow2
+*.img
+*.log

@@ -1,0 +1,14 @@
+# Use this file after importing the prebuilt image from the GitHub Release.
+services:
+  vohive:
+    image: local/vohive-qdc507:0.2.0
+    container_name: vohive-qdc507
+    restart: unless-stopped
+    privileged: true
+    network_mode: host
+    volumes:
+      - /dev:/dev
+      - /sys:/sys:rw
+      - /lib/modules:/lib/modules:ro
+      - ./runtime/data:/opt/vohive/data
+      - ./runtime/logs:/opt/vohive/logs

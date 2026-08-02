@@ -1,5 +1,4 @@
-# Proprietary application payloads and locally built artifacts
-vendor/vohive
+# Locally built artifacts
 *.tar
 *.zip
 *.qcow2
