@@ -25,8 +25,14 @@
 
 ## 构建与部署
 
-1. 执行 `docker compose -f compose.yml up -d --build`。
-2. 打开 `http://NAS_IP:7575`，首次登录为 `admin` / `vohive`；登录后立即修改密码。
+最简单的绿联 NAS 流程是：
+
+1. 从 [v0.2.0 Release](https://github.com/hei85/vohive-qdc507-nas-docker/releases/tag/v0.2.0) 下载 `vohive-qdc507-0.2.0-amd64.tar`。
+2. 在 Docker → 镜像 → 导入中导入这个 TAR。
+3. 在 Docker → 项目中新建项目，使用仓库中的 `compose.import.yml`。
+4. 打开 `http://NAS_IP:7575`；首次登录为 `admin` / `vohive`，登录后立即修改密码。
+
+不要把 TAR 粘贴到项目编辑框，也不要在导入现成镜像时使用 `compose.yml`。文件用途和逐屏操作见 [docs/使用指南.md](docs/使用指南.md)。
 
 UGREEN NAS 不能直接在项目中构建镜像时，可在另一台 Linux 主机执行：
 
