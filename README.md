@@ -1,73 +1,106 @@
-# VoHive QDC507 NAS Docker Toolkit
+# VoHive QDC507 绿联 NAS Docker 部署项目
 
-> Unofficial deployment helpers for using a Baiwang EG25G-QDC507-based DJI 4G module with VoHive on an amd64 Linux or UGREEN NAS host.
+这是一个面向绿联 NAS 和其他 amd64 Linux 主机的 VoHive 部署项目，专门整理了百望 EG25G-QDC507 类 USB 4G 模块在 Docker 中运行时需要的镜像、配置、驱动绑定脚本、热插拔恢复逻辑和中文使用说明。
 
-这个仓库提供完整的非商业源码构建、Docker 镜像导入、QMI 驱动绑定和热插拔恢复脚本。Release 会提供可直接导入 NAS Docker 的 amd64 镜像；SIM 配置、设备标识、账号密码、日志和 NAS 配置均不包含在仓库中。
+项目的目标是：**把模块插在 NAS 上，导入镜像，创建项目，打开网页即可管理；模块拔出再插回后，容器自动尝试恢复，不需要反复重建项目。**
 
-## 功能
+## 项目能做什么
 
-- 针对 `2ca3:4006`（BAIWANG EG25G-QDC507）注册 `qmi_wwan` 与 `option` 驱动。
-- 保留 `/dev`、`/sys` 和内核模块映射，使 USB 热插拔后生成的新设备节点可被容器使用。
-- 每 5 秒检查一次 QMI 控制节点；模块重插或 NAS 启动较慢时，会自动将 QMI 接口重新绑定，无需手动重启项目。
-- 提供一个可选的 Caddy 反向代理示例，用于让 UGREEN NAS 的 Quick Access 访问后台，而不改变主容器的硬件网络模式。
+- 在 Docker 中运行 VoHive 后台和网页管理界面。
+- 识别百望 EG25G-QDC507 的 USB 标识 `2ca3:4006`。
+- 自动加载或绑定 `qmi_wwan`、`cdc_wdm`、`option` 等 Linux 驱动。
+- 映射 `/dev`、`/sys` 和 `/lib/modules`，让 USB 重新枚举后生成的新设备节点继续可见。
+- 定时检查 QMI 控制通道；模块重插、NAS 启动较慢或设备节点变化时，自动尝试重新绑定。
+- 提供可选的绿联“快速访问”反向代理示例，不改变主容器访问 USB/QMI 所需的主机网络。
+- 提供可直接导入绿联 Docker 的 amd64 镜像发布包。
 
-## 许可与边界
+## 适合谁使用
 
-仓库内含的 VoHive 与 VoWiFi Go 源码均保留原始许可证和署名，详情见 [NOTICE.md](NOTICE.md)。VoHive 部分仅限非商业用途。本仓库的原创部署脚本和文档使用 MIT 许可证，见 `LICENSES/MIT.txt`。
+本项目适合已经拥有 QDC507 类模块、绿联 NAS 或 amd64 Linux 主机，并希望在 NAS 上运行 VoHive 的用户。使用者需要能够管理 NAS 的 Docker 应用，并接受特权容器需要访问 USB 设备和主机驱动的事实。
 
-本仓库不包含也不需要 DJI/百望/Quectel 的模块固件。它不会修改模块固件、IMEI 或序列号；只在 NAS 主机上重新绑定 Linux USB 网络驱动。
+## 最快部署方式
 
-## 前提条件
+普通绿联 NAS 不需要编译源码，按下面四步即可：
 
-- amd64 Linux/UGREEN NAS 主机，内核包含 `qmi_wwan`、`cdc_wdm` 与 `option` 模块。
-- Docker Compose v2 或兼容的 NAS Docker 项目功能。
-- 模块直接插在 NAS 的 USB 口。若保留虚拟机备份，请确保虚拟机已关机，避免 USB 被两个系统同时占用。
+1. 打开 [v0.2.0 发布页](https://github.com/hei85/vohive-qdc507-nas-docker/releases/tag/v0.2.0)。
+2. 下载 `vohive-qdc507-0.2.0-amd64.tar`，在绿联 Docker 的“镜像 → 导入”中导入。
+3. 下载同一发布页中的 `compose.import.yml`，在“项目 → 创建项目”中导入；如果界面没有文件导入按钮，就把文件内容粘贴到项目编辑框。
+4. 项目显示运行后，在浏览器打开 `http://NAS_IP:7575`。首次登录账号是 `admin`，密码是 `vohive`；登录后立即修改密码。
 
-## 构建与部署
+完整的文件对照、点击路径、设备检查和热插拔测试见 [中文逐步部署指南](docs/使用指南.md)。
 
-最简单的绿联 NAS 流程是：
+## 文件用途对照
 
-1. 从 [v0.2.0 Release](https://github.com/hei85/vohive-qdc507-nas-docker/releases/tag/v0.2.0) 下载 `vohive-qdc507-0.2.0-amd64.tar`。
-2. 在 Docker → 镜像 → 导入中导入这个 TAR。
-3. 在 Docker → 项目中新建项目，使用仓库中的 `compose.import.yml`。
-4. 打开 `http://NAS_IP:7575`；首次登录为 `admin` / `vohive`，登录后立即修改密码。
+| 文件 | 用途 | 普通绿联部署是否需要 |
+|---|---|---|
+| `vohive-qdc507-0.2.0-amd64.tar` | 已经构建好的 Docker 镜像 | 需要，导入“镜像” |
+| `compose.import.yml` | 使用已导入镜像创建项目 | 需要，创建“项目” |
+| `SHA256SUMS.txt` | 检查镜像下载是否完整 | 可选，不导入 |
+| `compose.yml` | 从源码构建镜像 | 不需要 |
+| `compose.ugreenlink.yml` | 可选“快速访问”代理 | 只有需要时才使用 |
+| `Dockerfile` | 镜像构建规则 | 不需要逐个导入 |
+| `docker-entrypoint.sh` | 启动、驱动绑定和热插拔恢复脚本 | 已经打包进镜像 |
+| `scripts/verify-qmi.sh` | 检查 QMI 设备和驱动 | 已经打包进镜像 |
+| `third_party/` | 可分发的上游源码快照 | 源码构建时使用 |
+| `docs/使用指南.md` | 中文详细说明 | 建议先阅读 |
 
-不要把 TAR 粘贴到项目编辑框，也不要在导入现成镜像时使用 `compose.yml`。文件用途和逐屏操作见 [docs/使用指南.md](docs/使用指南.md)。
+最容易混淆的地方是：**TAR 导入“镜像”，`compose.import.yml` 创建“项目”；两者不是同一种导入。**
 
-UGREEN NAS 不能直接在项目中构建镜像时，可在另一台 Linux 主机执行：
+## 运行原理
 
-```sh
-./scripts/export-image.sh vohive-qdc507-image.tar
-```
+主容器使用 `network_mode: host`（主机网络），因为 QMI 网络设备和 NAS 主机的 USB 驱动属于主机侧资源。Compose 配置还保留以下映射：
 
-然后从 NAS Docker 的“镜像导入”导入该 TAR，并用 `compose.import.yml` 创建项目。
+- `/dev:/dev`：让容器看到 USB 串口和 QMI 控制节点。
+- `/sys:/sys:rw`：允许恢复脚本重新绑定指定的 QDC507 USB 接口。
+- `/lib/modules:/lib/modules:ro`：读取主机已有的内核模块。
+- `runtime/data`：保存 VoHive 运行配置。
+- `runtime/logs`：保存日志和驱动恢复记录。
 
-## UGREENlink / Quick Access（可选）
+容器不会替 NAS 主机安装缺失的内核驱动。如果主机内核没有 `qmi_wwan`、`cdc_wdm` 或 `option`，需要先处理 NAS 内核支持问题。
 
-主服务需要 `network_mode: host` 才能可靠访问 USB/QMI 硬件。许多 NAS 的“快速访问”只代理 bridge 网络容器，因此可单独部署：
+## 设备识别与热插拔
 
-```sh
-docker compose -f compose.ugreenlink.yml up -d
-```
+容器启动时会尝试加载 QMI 相关驱动，并针对 QDC507 的 USB 接口进行绑定。随后每隔约 5 秒检查一次设备状态。模块拔出再插回同一个 USB 口后，通常等待 10～30 秒即可恢复；不同 NAS 的供电、USB 控制器和内核行为可能导致时间不同。
 
-它在 NAS 的 `37953` 端口提供反向代理；再从 UGREEN Docker 的容器快速访问入口打开该代理。不要把管理后台直接暴露到公网；务必设置强密码，并仅通过可信的远程访问方式使用。
-
-## 验证与故障排查
-
-在主容器中运行：
+进入容器终端执行下面的检查：
 
 ```sh
 verify-qmi
 ```
 
-正常时应看到至少一个 `/dev/cdc-wdm*` 节点，以及 `qmi_wwan`、`cdc_wdm`、`option` 内核模块。若没有 `cdc-wdm`，检查主机内核是否提供所需驱动；容器本身不能补齐主机缺失的内核模块。
+正常时至少应该能看到 `/dev/cdc-wdm0` 或其他编号的 `cdc-wdm` 节点，同时能看到 `qmi_wwan`、`cdc_wdm` 和 `option` 驱动。
 
-热插拔测试：保持容器运行，拔掉模块，等待约 10 秒后插回原 USB 口；最多约 30 秒应恢复。若超过一分钟仍未恢复，先检查模块供电和主机 USB 枚举情况，再查看 `runtime/logs/driver-init.log`。
+## 远程访问
 
-完整操作步骤见 [docs/使用指南.md](docs/使用指南.md)。
+主容器必须保留主机网络。部分绿联版本的“快速访问”只代理桥接网络容器，因此仓库提供了一个可选的 `compose.ugreenlink.yml`，用 Caddy 在 NAS 的 `37953` 端口代理到主服务的 `7575` 端口。
 
-## 安全与免责声明
+局域网使用不需要这个可选代理。无论使用哪种方式，都不要把管理后台直接暴露到公网；请使用强密码和可信的远程访问方式。
 
-该项目以特权容器方式挂载 `/dev` 和可写 `/sys`，仅应在你完全信任的个人 NAS 上运行。不要把此容器或后台直接暴露给互联网。该项目与 DJI、BAIWANG、UGREEN 和 VoHive 作者没有隶属关系或官方支持关系。
+## 从源码构建
 
-用户应自行遵守飞行安全、蜂窝通信、频谱、SIM 卡服务条款和当地法律。请勿将此工具用于规避设备限制、监管要求或未授权通信。
+如果使用者有一台具备 Docker 构建能力的 Linux 主机，可以执行：
+
+```sh
+docker compose -f compose.yml up -d --build
+```
+
+构建完成后，可执行下面的脚本导出镜像，再将生成的 TAR 导入绿联 NAS：
+
+```sh
+./scripts/export-image.sh vohive-qdc507-0.2.0-amd64.tar
+```
+
+普通绿联 NAS 直接使用发布页的预构建镜像即可，不需要执行源码构建。
+
+## 安全、隐私和许可证
+
+- 发布包不包含任何个人 IP、账号密码、IMEI、日志、SIM 配置或 NAS 运行数据。
+- 发布包不包含 DJI、百望或 Quectel 模块固件；本项目运行 VoHive 不需要给模块刷写固件。
+- 主容器使用特权模式并挂载主机设备，只应在自己完全信任的 NAS 上运行。
+- VoHive 源码保留原始 PolyForm 非商业许可证；VoWiFi Go、SWU Go 和本项目脚本/文档的许可证见 `NOTICE.md`、`LICENSE` 和各源码目录中的许可证文件。
+- 本项目与 DJI、百望、绿联、VoHive 原作者没有官方隶属关系，也不保证适配所有 NAS 内核或所有运营商网络。
+- 使用者应遵守飞行安全、蜂窝通信、频谱、SIM 服务条款和当地法律，不得将本项目用于规避设备限制或进行未授权通信。
+
+## 项目状态
+
+v0.2.0 已完成 amd64 镜像构建、镜像归档导入和网页启动验证。硬件识别和热插拔恢复仍取决于具体 NAS 的 USB 供电、内核驱动和模块状态；遇到设备未识别时，请先按照中文指南执行 `verify-qmi` 并查看容器日志。
