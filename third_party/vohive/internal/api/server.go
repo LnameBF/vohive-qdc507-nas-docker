@@ -259,6 +259,8 @@ func (s *Server) newRouter() *gin.Engine {
 		api.GET("/system/info", s.handleSystemInfo)            // 获取系统运行与版本信息
 		api.GET("/system/update/check", s.handleCheckUpdate)   // 检查系统更新
 		api.POST("/system/update/apply", s.handleApplyUpdate)  // 应用系统更新
+		api.GET("/system/disclaimer", s.handleGetDisclaimer)        // 查询免责声明是否已同意（服务端持久）
+		api.POST("/system/disclaimer/accept", s.handleAcceptDisclaimer) // 标记免责声明已同意
 
 		api.GET("/devices", s.handleDeviceMgmtList)                                            // 获取设备列表（管理页用）
 		api.POST("/devices", s.handleDeviceMgmtAddDevice)                                      // 添加新设备

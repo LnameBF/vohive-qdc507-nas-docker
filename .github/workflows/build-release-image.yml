@@ -4,12 +4,15 @@ on:
   workflow_dispatch:
     inputs:
       image_tag:
-        description: Docker image tag
+        description: Docker image tag (used only on manual runs; tag pushes derive it from the git tag)
         required: true
-        default: 0.2.0
+        default: 0.2.1
+  push:
+    tags:
+      - 'v*'
 
 permissions:
-  contents: read
+  contents: write   # needed by softprops/action-gh-release to create the Release
 
 jobs:
   build-amd64-image:
@@ -18,20 +21,40 @@ jobs:
       - name: Check out source
         uses: actions/checkout@v4
 
+      - name: Resolve version
+        id: ver
+        run: |
+          if [ "${GITHUB_REF_TYPE}" = "tag" ]; then
+            version="${GITHUB_REF_NAME#v}"
+          else
+            version="${{ inputs.image_tag }}"
+          fi
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "Building version: $version"
+
       - name: Build the deployment image from source
-        run: docker build --pull --tag local/vohive-qdc507:${{ inputs.image_tag }} .
+        run: docker build --pull --tag local/vohive-qdc507:${{ steps.ver.outputs.version }} .
 
       - name: Export a NAS-importable image archive
         run: |
-          docker save --output vohive-qdc507-${{ inputs.image_tag }}-amd64.tar local/vohive-qdc507:${{ inputs.image_tag }}
-          sha256sum vohive-qdc507-${{ inputs.image_tag }}-amd64.tar > SHA256SUMS.txt
+          docker save --output vohive-qdc507-${{ steps.ver.outputs.version }}-amd64.tar local/vohive-qdc507:${{ steps.ver.outputs.version }}
+          sha256sum vohive-qdc507-${{ steps.ver.outputs.version }}-amd64.tar > SHA256SUMS.txt
 
-      - name: Upload release-ready artifacts
+      - name: Upload build artifact (30 days, for inspection / manual runs)
         uses: actions/upload-artifact@v4
         with:
-          name: vohive-qdc507-${{ inputs.image_tag }}-amd64
+          name: vohive-qdc507-${{ steps.ver.outputs.version }}-amd64
           if-no-files-found: error
           path: |
-            vohive-qdc507-${{ inputs.image_tag }}-amd64.tar
+            vohive-qdc507-${{ steps.ver.outputs.version }}-amd64.tar
             SHA256SUMS.txt
           retention-days: 30
+
+      - name: Publish GitHub Release with the image archive
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            vohive-qdc507-${{ steps.ver.outputs.version }}-amd64.tar
+            SHA256SUMS.txt
+          generate_release_notes: true

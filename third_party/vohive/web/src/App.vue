@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, defineAsyncComponent, ref, onMounted, watch } from 'vue'
 import { useRoute } from 'vue-router'
-import { useAuthStore } from './stores/auth'
+import { api, useAuthStore } from './stores/auth'
 import LoadingScreen from './components/LoadingScreen.vue'
 import { ElMessage } from 'element-plus'
 
@@ -35,24 +35,36 @@ onMounted(() => {
   }
 })
 
-// 监听登录状态，每次登录后弹窗
-watch(() => auth.isAuthenticated, (isAuthenticated) => {
-  if (isAuthenticated) {
-    const agreed = sessionStorage.getItem('vohive_disclaimer_agreed')
-    if (agreed !== 'true') {
-      confirmText.value = ''
-      showDisclaimer.value = true
-    }
-  } else {
-    sessionStorage.removeItem('vohive_disclaimer_agreed')
+// 免责声明"是否已同意"由服务端持久化（data/ 下的标记文件）：
+// 任意设备首次同意后，所有设备/浏览器登录都不再提示。仅在已登录时向后台查询。
+async function refreshDisclaimer() {
+  if (!auth.isAuthenticated) {
     showDisclaimer.value = false
+    return
   }
+  try {
+    const { data } = await api.get<{ accepted?: boolean }>('/system/disclaimer')
+    confirmText.value = ''
+    showDisclaimer.value = !data?.accepted
+  } catch {
+    // 查询失败时按"未同意"处理：不因网络抖动绕过声明。
+    confirmText.value = ''
+    showDisclaimer.value = true
+  }
+}
+
+watch(() => auth.isAuthenticated, () => {
+  refreshDisclaimer()
 }, { immediate: true })
 
-function acceptDisclaimer() {
+async function acceptDisclaimer() {
   if (!canAccept.value) return
-  sessionStorage.setItem('vohive_disclaimer_agreed', 'true')
-  showDisclaimer.value = false
+  try {
+    await api.post('/system/disclaimer/accept')
+    showDisclaimer.value = false
+  } catch {
+    ElMessage.error('记录同意状态失败，请重试')
+  }
 }
 
 function rejectDisclaimer() {

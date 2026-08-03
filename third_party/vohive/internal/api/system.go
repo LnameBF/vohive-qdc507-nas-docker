@@ -107,6 +107,32 @@ func (s *Server) handleUninstall(c *gin.Context) {
 	}()
 }
 
+// disclaimerMarkerPath 标记"最终用户免责声明已被接受"。
+// 放在持久化数据目录 data/ 下：随 runtime/data 卷保留，跨设备/重启持久；
+// 自毁流程 (handleUninstall) 会清空 data/，因此拒绝重装后首次使用会正确地再次提示。
+// 与 handleUninstall 一样依赖进程 CWD（Docker 下 WORKDIR=/opt/vohive）。
+const disclaimerMarkerPath = "data/.disclaimer_accepted"
+
+// handleGetDisclaimer 返回免责声明是否已被任意管理员接受过（服务端持久，跨设备共享）。
+func (s *Server) handleGetDisclaimer(c *gin.Context) {
+	c.JSON(http.StatusOK, gin.H{"accepted": fileExists(disclaimerMarkerPath)})
+}
+
+// handleAcceptDisclaimer 落下免责声明已同意的标记文件，无其他副作用。
+func (s *Server) handleAcceptDisclaimer(c *gin.Context) {
+	if err := os.MkdirAll("data", 0o755); err != nil {
+		logger.Error("创建数据目录失败", "err", err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	if err := os.WriteFile(disclaimerMarkerPath, []byte("accepted\n"), 0o644); err != nil {
+		logger.Error("写入免责声明标记失败", "err", err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"accepted": true})
+}
+
 func fileExists(path string) bool {
 	_, err := os.Stat(path)
 	return err == nil

@@ -1,7 +1,7 @@
 # Use this file after importing the prebuilt image from the GitHub Release.
 services:
   vohive:
-    image: local/vohive-qdc507:0.2.0
+    image: local/vohive-qdc507:0.2.1
     container_name: vohive-qdc507
     restart: unless-stopped
     privileged: true

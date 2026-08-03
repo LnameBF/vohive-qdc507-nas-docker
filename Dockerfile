@@ -26,7 +26,7 @@ RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -mod=mod \
       -trimpath \
       -buildvcs=false \
       -tags 'with_utls nomsgpack' \
-      -ldflags "-s -w -X 'github.com/iniwex5/vohive/internal/global.Version=v0.2.0-qdc507'" \
+      -ldflags "-s -w -X 'github.com/iniwex5/vohive/internal/global.Version=v0.2.1-qdc507'" \
       -o /out/vohive \
       ./cmd/vohive
 
