@@ -1,6 +1,7 @@
 package device
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -240,6 +241,49 @@ func TestDiscoverQMIDeviceFromSysFSPrefersLowerNumericQMIInterface(t *testing.T)
 	}
 	if got.ControlPath != "/dev/cdc-wdm2" {
 		t.Fatalf("ControlPath=%q want /dev/cdc-wdm2", got.ControlPath)
+	}
+}
+
+func TestDiscoverQMIDeviceFromSysFSPrefersQDC507InterfaceFour(t *testing.T) {
+	usbPath := t.TempDir()
+	usbName := filepath.Base(usbPath)
+
+	write := func(rel, content string) {
+		t.Helper()
+		path := filepath.Join(usbPath, rel)
+		if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+			t.Fatalf("mkdir %s: %v", rel, err)
+		}
+		if err := os.WriteFile(path, []byte(content), 0o644); err != nil {
+			t.Fatalf("write %s: %v", rel, err)
+		}
+	}
+
+	write("idVendor", "2ca3\n")
+	write("idProduct", "4006\n")
+
+	for i := 1; i <= 4; i++ {
+		ifacePath := filepath.Join(usbPath, fmt.Sprintf("%s:1.%d", usbName, i))
+		if err := os.MkdirAll(filepath.Join(ifacePath, "net", fmt.Sprintf("wwan%d", i-1)), 0o755); err != nil {
+			t.Fatalf("mkdir net iface %d: %v", i, err)
+		}
+		if err := os.MkdirAll(filepath.Join(ifacePath, "usbmisc", fmt.Sprintf("cdc-wdm%d", i-1)), 0o755); err != nil {
+			t.Fatalf("mkdir cdc-wdm tree %d: %v", i, err)
+		}
+		if err := os.Symlink("/tmp/qmi_wwan", filepath.Join(ifacePath, "driver")); err != nil {
+			t.Fatalf("symlink driver %d: %v", i, err)
+		}
+	}
+
+	got, err := discoverQMIDeviceFromSysFS(usbPath)
+	if err != nil {
+		t.Fatalf("discoverQMIDeviceFromSysFS() error = %v", err)
+	}
+	if got.NetInterface != "wwan3" {
+		t.Fatalf("NetInterface=%q want wwan3", got.NetInterface)
+	}
+	if got.ControlPath != "/dev/cdc-wdm3" {
+		t.Fatalf("ControlPath=%q want /dev/cdc-wdm3", got.ControlPath)
 	}
 }
 
