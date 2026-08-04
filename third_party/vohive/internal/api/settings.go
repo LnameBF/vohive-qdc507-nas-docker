@@ -77,6 +77,15 @@ type notificationSettingsResponse struct {
 		UIDs     []string `json:"uids"`
 		TopicIDs []int64  `json:"topic_ids"`
 	} `json:"wxpusher"`
+	ServerChan struct {
+		Enabled            bool   `json:"enabled"`
+		SendKey            string `json:"send_key"`
+		Channel            string `json:"channel"`
+		HideIP             bool   `json:"hide_ip"`
+		OpenID             string `json:"openid"`
+		EncryptionPassword string `json:"encryption_password"`
+		EncryptionUID      string `json:"encryption_uid"`
+	} `json:"serverchan"`
 }
 
 type updateNotificationSettingsRequest struct {
@@ -140,6 +149,15 @@ type updateNotificationSettingsRequest struct {
 		UIDs     []string `json:"uids"`
 		TopicIDs []string `json:"topic_ids"`
 	} `json:"wxpusher"`
+	ServerChan struct {
+		Enabled            bool   `json:"enabled"`
+		SendKey            string `json:"send_key"`
+		Channel            string `json:"channel"`
+		HideIP             bool   `json:"hide_ip"`
+		OpenID             string `json:"openid"`
+		EncryptionPassword string `json:"encryption_password"`
+		EncryptionUID      string `json:"encryption_uid"`
+	} `json:"serverchan"`
 }
 
 func (s *Server) handleGetNotificationSettings(c *gin.Context) {
@@ -193,6 +211,14 @@ func (s *Server) handleGetNotificationSettings(c *gin.Context) {
 	resp.WXPusher.AppToken = s.fullCfg.WXPusher.AppToken
 	resp.WXPusher.UIDs = append([]string(nil), s.fullCfg.WXPusher.UIDs...)
 	resp.WXPusher.TopicIDs = append([]int64(nil), s.fullCfg.WXPusher.TopicIDs...)
+
+	resp.ServerChan.Enabled = s.fullCfg.ServerChan.Enabled
+	resp.ServerChan.SendKey = s.fullCfg.ServerChan.SendKey
+	resp.ServerChan.Channel = s.fullCfg.ServerChan.Channel
+	resp.ServerChan.HideIP = s.fullCfg.ServerChan.HideIP
+	resp.ServerChan.OpenID = s.fullCfg.ServerChan.OpenID
+	resp.ServerChan.EncryptionPassword = s.fullCfg.ServerChan.EncryptionPassword
+	resp.ServerChan.EncryptionUID = s.fullCfg.ServerChan.EncryptionUID
 
 	c.JSON(http.StatusOK, resp)
 }
@@ -311,6 +337,15 @@ func (s *Server) handleUpdateNotificationSettings(c *gin.Context) {
 		UIDs:     normalizeWXPusherUIDs(req.WXPusher.UIDs),
 		TopicIDs: wxpusherTopicIDs,
 	}
+	serverChan := config.ServerChanConfig{
+		Enabled:            req.ServerChan.Enabled,
+		SendKey:            strings.TrimSpace(req.ServerChan.SendKey),
+		Channel:            strings.TrimSpace(req.ServerChan.Channel),
+		HideIP:             req.ServerChan.HideIP,
+		OpenID:             strings.TrimSpace(req.ServerChan.OpenID),
+		EncryptionPassword: strings.TrimSpace(req.ServerChan.EncryptionPassword),
+		EncryptionUID:      strings.TrimSpace(req.ServerChan.EncryptionUID),
+	}
 
 	if tg.Enabled {
 		if tg.BotToken == "" || tg.ChatID == 0 {
@@ -363,7 +398,17 @@ func (s *Server) handleUpdateNotificationSettings(c *gin.Context) {
 		return
 	}
 
-	if err := config.UpdateNotificationInFile(s.configPath, tg, fs, qq, wh, barkCfg, em, pp, wxpusher); err != nil {
+	if serverChan.Enabled && serverChan.SendKey == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"status": "error", "message": "Server 酱启用时必须填写 SendKey"})
+		return
+	}
+
+	if (serverChan.EncryptionPassword == "") != (serverChan.EncryptionUID == "") {
+		c.JSON(http.StatusBadRequest, gin.H{"status": "error", "message": "Server 酱端对端加密的密码和 UID 必须同时填写"})
+		return
+	}
+
+	if err := config.UpdateNotificationInFile(s.configPath, tg, fs, qq, wh, barkCfg, em, pp, wxpusher, serverChan); err != nil {
 		logger.Error("写入通知配置失败", "err", err)
 		c.JSON(http.StatusInternalServerError, gin.H{"status": "error", "message": "写入配置文件失败: " + err.Error()})
 		return
@@ -377,6 +422,7 @@ func (s *Server) handleUpdateNotificationSettings(c *gin.Context) {
 	s.fullCfg.Email = em
 	s.fullCfg.Pushplus = pp
 	s.fullCfg.WXPusher = wxpusher
+	s.fullCfg.ServerChan = serverChan
 
 	if s.notifyMgr != nil {
 		if err := s.notifyMgr.UpdateConfig(s.fullCfg); err != nil {

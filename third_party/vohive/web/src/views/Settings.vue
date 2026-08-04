@@ -16,7 +16,7 @@ import {
 } from '@vicons/fluent'
 
 const settingsStore = useSettingsStore()
-const { systemInfo, loadingNotifications, savingNotifications, testingWebhook, testingBark, testingEmail, changingPassword, passwordForm, telegramForm, feishuForm, qqForm, webhookSettings, barkSettings, emailForm, pushplusForm, wxpusherForm } = storeToRefs(settingsStore)
+const { systemInfo, loadingNotifications, savingNotifications, testingWebhook, testingBark, testingEmail, testingServerChan, changingPassword, passwordForm, telegramForm, feishuForm, qqForm, webhookSettings, barkSettings, emailForm, pushplusForm, wxpusherForm, serverChanForm } = storeToRefs(settingsStore)
 const activeNotifyTab = ref('telegram')
 
 
@@ -34,6 +34,8 @@ const hasValidBarkURLs = computed(() => {
   }
   return barkSettings.value.urls.some((u) => String(u || '').trim().length > 0)
 })
+
+const hasValidServerChanSendKey = computed(() => String(serverChanForm.value.send_key || '').trim().length > 0)
 
 const hasValidEmailConfig = computed(() => {
   return !!(
@@ -224,6 +226,23 @@ async function testEmailNotification() {
     ElMessage.error(data.message || 'Email 测试失败')
   } catch (e: unknown) {
     ElMessage.error(e instanceof Error ? e.message : 'Email 测试失败')
+  }
+}
+
+async function testServerChanNotification() {
+  try {
+    const result = await settingsStore.testServerChanFromForm()
+    if (!result.ok) {
+      throw new Error(result.error.message || 'Server 酱测试失败')
+    }
+    const data = result.data
+    if (data.ok) {
+      ElMessage.success(data.message || '测试通知已提交到 Server 酱推送队列')
+      return
+    }
+    ElMessage.error(data.message || 'Server 酱测试失败')
+  } catch (e: unknown) {
+    ElMessage.error(e instanceof Error ? e.message : 'Server 酱测试失败')
   }
 }
 
@@ -439,7 +458,7 @@ onBeforeUnmount(() => {
                </div>
                <div>
                   <h3 class="text-lg font-bold text-gray-800 dark:text-gray-100">通知</h3>
-                  <p class="text-xs text-gray-500">Telegram / 飞书 / QQ / WxPusher / Webhook</p>
+                  <p class="text-xs text-gray-500">Telegram / 飞书 / QQ / WxPusher / Server 酱 / Webhook</p>
                </div>
             </div>
             <el-button type="primary" :loading="savingNotifications" :disabled="loadingNotifications" @click="saveNotifications" class="!border-0">
@@ -746,6 +765,64 @@ onBeforeUnmount(() => {
                   </div>
                   <div class="p-3 rounded-xl bg-blue-50/50 dark:bg-blue-500/5 text-xs text-blue-600 dark:text-blue-400/80 leading-relaxed border border-blue-100/50 dark:border-blue-500/10">
                     使用标准推送：通知正文以 Markdown 发送。请在 <a href="https://wxpusher.zjiecode.com/docs/api-reference.html" target="_blank" rel="noopener noreferrer" class="underline hover:text-blue-700">WxPusher 标准推送文档</a> 中创建应用并获取 AppToken、UID 或 Topic ID。
+                  </div>
+                </div>
+              </el-tab-pane>
+
+              <!-- Server 酱³·Turbo -->
+              <el-tab-pane label="Server 酱" name="serverchan" class="pt-2">
+                <div class="flex items-center justify-between mb-4">
+                  <div class="flex items-center gap-2">
+                    <div class="font-bold text-gray-800 dark:text-gray-100">启用 Server 酱³·Turbo 推送</div>
+                  </div>
+                  <div class="flex items-center gap-2">
+                    <el-button
+                      size="small"
+                      type="primary"
+                      plain
+                      :loading="testingServerChan"
+                      :disabled="!serverChanForm.enabled || !hasValidServerChanSendKey"
+                      @click="testServerChanNotification"
+                    >
+                      测试通知
+                    </el-button>
+                    <el-switch v-model="serverChanForm.enabled" />
+                  </div>
+                </div>
+
+                <div class="space-y-4">
+                  <div class="space-y-1">
+                    <label class="text-xs font-bold text-gray-500 uppercase tracking-wider">SendKey</label>
+                    <el-input v-model="serverChanForm.send_key" :disabled="!serverChanForm.enabled" type="password" show-password placeholder="SCTxxxxxxxxxxxxxxxxxxxxxxxx" />
+                    <div class="text-[10px] text-gray-400 mt-1">在 Server 酱³·Turbo 控制台获取；启用时必填。</div>
+                  </div>
+                  <div class="space-y-1">
+                    <label class="text-xs font-bold text-gray-500 uppercase tracking-wider">通道（可选）</label>
+                    <el-input v-model="serverChanForm.channel" :disabled="!serverChanForm.enabled" placeholder="例如 9|66，同时指定两个通道" />
+                  </div>
+                  <div class="space-y-1">
+                    <label class="text-xs font-bold text-gray-500 uppercase tracking-wider">抄送 OpenID（可选）</label>
+                    <el-input v-model="serverChanForm.openid" :disabled="!serverChanForm.enabled" placeholder="测试号用逗号分隔；企业微信应用消息用 | 分隔" />
+                  </div>
+                  <div class="flex items-center justify-between rounded-xl border border-gray-100 dark:border-white/10 p-3">
+                    <div>
+                      <div class="text-sm font-medium text-gray-700 dark:text-gray-200">隐藏调用 IP</div>
+                      <div class="text-[10px] text-gray-400 mt-1">向 Server 酱传递 <code>noip=1</code>。</div>
+                    </div>
+                    <el-switch v-model="serverChanForm.hide_ip" :disabled="!serverChanForm.enabled" />
+                  </div>
+                  <div class="space-y-1">
+                    <label class="text-xs font-bold text-gray-500 uppercase tracking-wider">端对端加密密码（可选）</label>
+                    <el-input v-model="serverChanForm.encryption_password" :disabled="!serverChanForm.enabled" type="password" show-password placeholder="留空则不加密" />
+                  </div>
+                  <div class="space-y-1">
+                    <label class="text-xs font-bold text-gray-500 uppercase tracking-wider">加密 UID（可选）</label>
+                    <el-input v-model="serverChanForm.encryption_uid" :disabled="!serverChanForm.enabled" placeholder="端对端加密时填写 Server 酱账户 UID" />
+                    <div class="text-[10px] text-gray-400 mt-1">加密密码和 UID 必须同时填写；消息正文会按 Server 酱的 AES-128-CBC 规则加密。</div>
+                  </div>
+                  <div class="p-3 rounded-xl bg-blue-50/50 dark:bg-blue-500/5 text-xs text-blue-600 dark:text-blue-400/80 leading-relaxed border border-blue-100/50 dark:border-blue-500/10">
+                    通知正文以 Markdown 发送；标题会自动截断至 Server 酱允许的 32 个字符。
+                    <a href="https://sct.ftqq.com/" target="_blank" rel="noopener noreferrer" class="underline hover:text-blue-700">打开 Server 酱³·Turbo</a>
                   </div>
                 </div>
               </el-tab-pane>

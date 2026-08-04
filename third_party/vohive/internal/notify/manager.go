@@ -158,6 +158,16 @@ func (m *Manager) initChannels(cfg *config.Config) error {
 		}
 	}
 
+	// Server 酱³·Turbo 渠道
+	if cfg.ServerChan.Enabled {
+		sc, err := NewServerChanChannel(cfg.ServerChan)
+		if err != nil {
+			logger.Error("初始化 Server 酱渠道失败", "err", err)
+			return err
+		}
+		m.channels = append(m.channels, sc)
+	}
+
 	// 向所有渠道注册命令
 	m.registerCommands()
 

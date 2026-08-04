@@ -89,6 +89,16 @@ export type WXPusherSettings = {
   topic_ids: number[]
 }
 
+export type ServerChanSettings = {
+  enabled: boolean
+  send_key: string
+  channel: string
+  hide_ip: boolean
+  openid: string
+  encryption_password: string
+  encryption_uid: string
+}
+
 export type NotificationsSettingsResponse = {
   telegram?: Partial<TelegramSettings>
   feishu?: Partial<FeishuSettings>
@@ -96,6 +106,8 @@ export type NotificationsSettingsResponse = {
   email?: Partial<EmailSettings>
   pushplus?: Partial<PushplusSettings>
   wxpusher?: Partial<WXPusherSettings>
+
+  serverchan?: Partial<ServerChanSettings>
   webhook?: Partial<WebhookSettings>
   bark?: Partial<BarkSettings>
 }
@@ -143,6 +155,15 @@ export type SaveNotificationsPayload = {
     app_token: string
     uids: string[]
     topic_ids: string[]
+  }
+  serverchan: {
+    enabled: boolean
+    send_key: string
+    channel: string
+    hide_ip: boolean
+    openid: string
+    encryption_password: string
+    encryption_uid: string
   }
   webhook: {
     enabled: boolean
@@ -213,6 +234,13 @@ export type TestEmailResponse = {
   message: string
 }
 
+export type TestServerChanPayload = ServerChanSettings
+
+export type TestServerChanResponse = {
+  ok: boolean
+  message: string
+}
+
 export const systemService = {
   getInfo() {
     return callService(async () => {
@@ -256,6 +284,12 @@ export const systemService = {
   testEmail(payload: TestEmailPayload) {
     return callService(async () => {
       const res = await api.post<TestEmailResponse>('/settings/notifications/email/test', payload)
+      return res.data
+    })
+  },
+  testServerChan(payload: TestServerChanPayload) {
+    return callService(async () => {
+      const res = await api.post<TestServerChanResponse>('/settings/notifications/serverchan/test', payload)
       return res.data
     })
   },

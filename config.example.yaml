@@ -13,3 +13,12 @@ vowifi:
 
 webhook:
   enabled: false
+
+serverchan:
+  enabled: false
+  send_key: ""
+  channel: ""
+  hide_ip: false
+  openid: ""
+  encryption_password: ""
+  encryption_uid: ""
