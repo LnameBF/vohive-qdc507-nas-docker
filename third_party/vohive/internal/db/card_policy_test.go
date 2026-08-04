@@ -23,8 +23,8 @@ func TestDefaultCardPolicy(t *testing.T) {
 	if p.ICCID != "8986001234567890123" {
 		t.Fatalf("ICCID=%q", p.ICCID)
 	}
-	if p.NetworkEnabled || p.VoWiFiEnabled || p.AirplaneEnabled {
-		t.Fatal("默认应全关")
+	if p.NetworkEnabled || p.VoWiFiEnabled || !p.AirplaneEnabled {
+		t.Fatal("默认应关闭网络和 VoWiFi，并开启飞行模式")
 	}
 	if p.IPVersion != "v4" {
 		t.Fatalf("默认 ip=%q，应 v4", p.IPVersion)

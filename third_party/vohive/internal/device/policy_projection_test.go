@@ -54,6 +54,29 @@ func TestProjectionEnterAirplaneIdempotent(t *testing.T) {
 	}
 }
 
+func TestHandleSIMStatusEventQuarantinesInsertedSIM(t *testing.T) {
+	p := &Pool{
+		ctx:            context.Background(),
+		workers:        make(map[string]*Worker),
+		simEventTimers: make(map[string]*time.Timer),
+	}
+	stub := &workerStatusBackendStub{opMode: backend.ModeOnline}
+	p.workers["wwan0"] = &Worker{ID: "wwan0", Backend: stub}
+	inserted := true
+
+	p.handleSIMStatusEvent("wwan0", "test", &inserted, "")
+
+	if len(stub.setOpModeCalls) != 1 || stub.setOpModeCalls[0] != backend.ModeRFOff {
+		t.Fatalf("热插卡时应立即关闭射频: %+v", stub.setOpModeCalls)
+	}
+	if p.workers["wwan0"].Config.NetworkEnabled || p.workers["wwan0"].Config.VoWiFiEnabled || !p.workers["wwan0"].Config.AirplaneEnabled {
+		t.Fatalf("热插卡隔离策略错误: %+v", p.workers["wwan0"].Config)
+	}
+	p.simEventMu.Lock()
+	p.simEventTimers["wwan0"].Stop()
+	p.simEventMu.Unlock()
+}
+
 // 投影时按策略退出飞行：当前 RFOff 且策略不要求飞行 ⇒ 切回 Online。
 func TestProjectionExitsAirplaneMode(t *testing.T) {
 	p := &Pool{ctx: context.Background()}

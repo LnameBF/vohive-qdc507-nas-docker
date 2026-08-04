@@ -519,7 +519,7 @@ func TestResolveDiscoveredCompatibleModemRequiresVerifiedATPortForIMEI(t *testin
 	}
 }
 
-func TestPoolConfirmSIMRemovedStopsVoWiFi(t *testing.T) {
+func TestPoolReconcileSIMRemovedStopsVoWiFi(t *testing.T) {
 	p := NewPool(&config.Config{})
 	defer p.cancel()
 	backend := &workerStatusBackendStub{simInserted: false}
@@ -536,7 +536,7 @@ func TestPoolConfirmSIMRemovedStopsVoWiFi(t *testing.T) {
 		return nil
 	}
 
-	p.confirmSIMRemovedAndStopVoWiFi("dev-1", "test")
+	p.reconcileSIMStatusEvent("dev-1", "test")
 
 	if got.Kind != vowifihost.LifecycleCommandDisable {
 		t.Fatalf("expected disable command, got %v", got.Kind)

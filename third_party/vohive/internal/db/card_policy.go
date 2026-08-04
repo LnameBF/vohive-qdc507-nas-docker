@@ -30,7 +30,7 @@ func DefaultCardPolicy(iccid string) CardPolicy {
 		ICCID:           strings.TrimSpace(iccid),
 		NetworkEnabled:  false,
 		VoWiFiEnabled:   false,
-		AirplaneEnabled: false,
+		AirplaneEnabled: true,
 		IPVersion:       "v4",
 		APN:             "",
 		Source:          "auto",

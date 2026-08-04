@@ -661,12 +661,6 @@ func (p *Pool) bindQMIStateIndications(worker *Worker) {
 	worker.QMICore.OnSimStatusChanged(func() {
 		logger.Info("[事件驱动] SIM 状态变化", "device", worker.ID)
 		p.handleSIMStatusEvent(worker.ID, "qmi_sim_status", nil, "")
-		p.wakeDesiredVoWiFiRecoverFromDeviceEvent(worker.ID, "post_switch_qmi_sim_status")
-		go func() {
-			if err := p.applyNetworkPreference(worker); err != nil {
-				logger.Warn("SIM 状态变化后 QMI 网络偏好协调失败", "device", worker.ID, "err", err)
-			}
-		}()
 	})
 }
 
@@ -678,7 +672,6 @@ func (p *Pool) bindMBIMStateIndications(worker *Worker) {
 	worker.MBIMCore.OnSimStatusChanged(func() {
 		logger.Info("[事件驱动] MBIM SIM 状态变化", "device", worker.ID)
 		p.handleSIMStatusEvent(worker.ID, "mbim_sim_status", nil, "")
-		p.wakeDesiredVoWiFiRecoverFromDeviceEvent(worker.ID, "post_switch_mbim_sim_status")
 	})
 }
 
@@ -783,12 +776,11 @@ func (p *Pool) handleSIMStatusEvent(deviceID, source string, insertedHint *bool,
 	if p == nil || deviceID == "" {
 		return
 	}
-	if insertedHint != nil && *insertedHint {
+	if strings.EqualFold(strings.TrimSpace(state), "READY") && (insertedHint == nil || !*insertedHint) {
 		return
 	}
-	if strings.EqualFold(strings.TrimSpace(state), "READY") {
-		return
-	}
+	p.quarantineSIMRadio(deviceID, source)
+	p.clearDesiredVoWiFiRecoverState(deviceID)
 
 	p.simEventMu.Lock()
 	if p.simEventTimers == nil {
@@ -798,9 +790,36 @@ func (p *Pool) handleSIMStatusEvent(deviceID, source string, insertedHint *bool,
 		timer.Stop()
 	}
 	p.simEventTimers[deviceID] = time.AfterFunc(1500*time.Millisecond, func() {
-		p.confirmSIMRemovedAndStopVoWiFi(deviceID, source)
+		p.reconcileSIMStatusEvent(deviceID, source)
 	})
 	p.simEventMu.Unlock()
+}
+
+// quarantineSIMRadio 先切断数据并关闭射频，避免热插卡在完成策略解析前注册网络。
+func (p *Pool) quarantineSIMRadio(deviceID, reason string) {
+	w := p.GetWorker(deviceID)
+	if w == nil || w.Backend == nil {
+		return
+	}
+	if nc := w.NetworkController(); nc != nil && nc.IsConnected() {
+		if err := w.StopNetwork(); err != nil {
+			logger.Warn("SIM 状态变化后断开数据网络失败", "device", deviceID, "reason", reason, "err", err)
+		}
+	}
+	w.clearCachedIP()
+	w.Config.NetworkEnabled = false
+	w.Config.VoWiFiEnabled = false
+	w.Config.AirplaneEnabled = true
+
+	ctx := p.ctx
+	if ctx == nil {
+		ctx = context.Background()
+	}
+	ctx, cancel := context.WithTimeout(ctx, 3*time.Second)
+	defer cancel()
+	if err := w.Backend.SetOperatingMode(ctx, backend.ModeRFOff); err != nil {
+		logger.Warn("SIM 状态变化后关闭射频失败", "device", deviceID, "reason", reason, "err", err)
+	}
 }
 
 var deviceEventRecoverWakeDelay = 500 * time.Millisecond
@@ -886,7 +905,8 @@ func (p *Pool) flushDesiredVoWiFiRecoverFromDeviceEvent(deviceID string) {
 	p.scheduleDesiredVoWiFiRecover(deviceID, reason, time.Now())
 }
 
-func (p *Pool) confirmSIMRemovedAndStopVoWiFi(deviceID, source string) {
+// reconcileSIMStatusEvent 在状态稳定后区分插卡与拔卡，并应用相应策略。
+func (p *Pool) reconcileSIMStatusEvent(deviceID, source string) {
 	p.simEventMu.Lock()
 	delete(p.simEventTimers, deviceID)
 	p.simEventMu.Unlock()
@@ -912,7 +932,9 @@ func (p *Pool) confirmSIMRemovedAndStopVoWiFi(deviceID, source string) {
 		return
 	}
 	if inserted {
-		_ = w.RefreshRuntime(ctx, "sim_status_inserted")
+		if _, err := p.refreshIdentityAndApplyCardPolicy(w, "sim_status_inserted"); err != nil {
+			logger.Warn("热插卡后应用卡策略失败", "device", deviceID, "source", source, "err", err)
+		}
 		return
 	}
 
