@@ -54,7 +54,7 @@ func TestProjectionEnterAirplaneIdempotent(t *testing.T) {
 	}
 }
 
-func TestHandleSIMStatusEventQuarantinesInsertedSIM(t *testing.T) {
+func TestHandleSIMStatusEventQuarantinesSIMReadyURC(t *testing.T) {
 	p := &Pool{
 		ctx:            context.Background(),
 		workers:        make(map[string]*Worker),
@@ -62,9 +62,7 @@ func TestHandleSIMStatusEventQuarantinesInsertedSIM(t *testing.T) {
 	}
 	stub := &workerStatusBackendStub{opMode: backend.ModeOnline}
 	p.workers["wwan0"] = &Worker{ID: "wwan0", Backend: stub}
-	inserted := true
-
-	p.handleSIMStatusEvent("wwan0", "test", &inserted, "")
+	p.handleSIMStatusEvent("wwan0", "test", nil, "READY")
 
 	if len(stub.setOpModeCalls) != 1 || stub.setOpModeCalls[0] != backend.ModeRFOff {
 		t.Fatalf("热插卡时应立即关闭射频: %+v", stub.setOpModeCalls)

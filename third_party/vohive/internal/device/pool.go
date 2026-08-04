@@ -776,9 +776,7 @@ func (p *Pool) handleSIMStatusEvent(deviceID, source string, insertedHint *bool,
 	if p == nil || deviceID == "" {
 		return
 	}
-	if strings.EqualFold(strings.TrimSpace(state), "READY") && (insertedHint == nil || !*insertedHint) {
-		return
-	}
+	// 部分 AT 模组仅通过 +CPIN: READY 上报插卡；不能将其忽略。
 	p.quarantineSIMRadio(deviceID, source)
 	p.clearDesiredVoWiFiRecoverState(deviceID)
 
