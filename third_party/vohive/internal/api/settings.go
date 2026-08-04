@@ -1,7 +1,9 @@
 package api
 
 import (
+	"fmt"
 	"net/http"
+	"strconv"
 	"strings"
 
 	"github.com/iniwex5/vohive/internal/config"
@@ -69,6 +71,21 @@ type notificationSettingsResponse struct {
 		Topic   string `json:"topic"`
 		Channel string `json:"channel"`
 	} `json:"pushplus"`
+	WXPusher struct {
+		Enabled  bool     `json:"enabled"`
+		AppToken string   `json:"app_token"`
+		UIDs     []string `json:"uids"`
+		TopicIDs []int64  `json:"topic_ids"`
+	} `json:"wxpusher"`
+	ServerChan struct {
+		Enabled            bool   `json:"enabled"`
+		SendKey            string `json:"send_key"`
+		Channel            string `json:"channel"`
+		HideIP             bool   `json:"hide_ip"`
+		OpenID             string `json:"openid"`
+		EncryptionPassword string `json:"encryption_password"`
+		EncryptionUID      string `json:"encryption_uid"`
+	} `json:"serverchan"`
 }
 
 type updateNotificationSettingsRequest struct {
@@ -126,6 +143,21 @@ type updateNotificationSettingsRequest struct {
 		Topic   string `json:"topic"`
 		Channel string `json:"channel"`
 	} `json:"pushplus"`
+	WXPusher struct {
+		Enabled  bool     `json:"enabled"`
+		AppToken string   `json:"app_token"`
+		UIDs     []string `json:"uids"`
+		TopicIDs []string `json:"topic_ids"`
+	} `json:"wxpusher"`
+	ServerChan struct {
+		Enabled            bool   `json:"enabled"`
+		SendKey            string `json:"send_key"`
+		Channel            string `json:"channel"`
+		HideIP             bool   `json:"hide_ip"`
+		OpenID             string `json:"openid"`
+		EncryptionPassword string `json:"encryption_password"`
+		EncryptionUID      string `json:"encryption_uid"`
+	} `json:"serverchan"`
 }
 
 func (s *Server) handleGetNotificationSettings(c *gin.Context) {
@@ -174,6 +206,19 @@ func (s *Server) handleGetNotificationSettings(c *gin.Context) {
 	resp.Pushplus.Token = s.fullCfg.Pushplus.Token
 	resp.Pushplus.Topic = s.fullCfg.Pushplus.Topic
 	resp.Pushplus.Channel = s.fullCfg.Pushplus.Channel
+
+	resp.WXPusher.Enabled = s.fullCfg.WXPusher.Enabled
+	resp.WXPusher.AppToken = s.fullCfg.WXPusher.AppToken
+	resp.WXPusher.UIDs = append([]string(nil), s.fullCfg.WXPusher.UIDs...)
+	resp.WXPusher.TopicIDs = append([]int64(nil), s.fullCfg.WXPusher.TopicIDs...)
+
+	resp.ServerChan.Enabled = s.fullCfg.ServerChan.Enabled
+	resp.ServerChan.SendKey = s.fullCfg.ServerChan.SendKey
+	resp.ServerChan.Channel = s.fullCfg.ServerChan.Channel
+	resp.ServerChan.HideIP = s.fullCfg.ServerChan.HideIP
+	resp.ServerChan.OpenID = s.fullCfg.ServerChan.OpenID
+	resp.ServerChan.EncryptionPassword = s.fullCfg.ServerChan.EncryptionPassword
+	resp.ServerChan.EncryptionUID = s.fullCfg.ServerChan.EncryptionUID
 
 	c.JSON(http.StatusOK, resp)
 }
@@ -278,6 +323,30 @@ func (s *Server) handleUpdateNotificationSettings(c *gin.Context) {
 		Channel: strings.TrimSpace(req.Pushplus.Channel),
 	}
 
+	wxpusherTopicIDs, err := parseWXPusherTopicIDs(req.WXPusher.TopicIDs)
+	if err != nil && req.WXPusher.Enabled {
+		c.JSON(http.StatusBadRequest, gin.H{"status": "error", "message": err.Error()})
+		return
+	}
+	if err != nil {
+		wxpusherTopicIDs = nil
+	}
+	wxpusher := config.WXPusherConfig{
+		Enabled:  req.WXPusher.Enabled,
+		AppToken: strings.TrimSpace(req.WXPusher.AppToken),
+		UIDs:     normalizeWXPusherUIDs(req.WXPusher.UIDs),
+		TopicIDs: wxpusherTopicIDs,
+	}
+	serverChan := config.ServerChanConfig{
+		Enabled:            req.ServerChan.Enabled,
+		SendKey:            strings.TrimSpace(req.ServerChan.SendKey),
+		Channel:            strings.TrimSpace(req.ServerChan.Channel),
+		HideIP:             req.ServerChan.HideIP,
+		OpenID:             strings.TrimSpace(req.ServerChan.OpenID),
+		EncryptionPassword: strings.TrimSpace(req.ServerChan.EncryptionPassword),
+		EncryptionUID:      strings.TrimSpace(req.ServerChan.EncryptionUID),
+	}
+
 	if tg.Enabled {
 		if tg.BotToken == "" || tg.ChatID == 0 {
 			c.JSON(http.StatusBadRequest, gin.H{"status": "error", "message": "Telegram 启用时必须填写 bot_token 与 chat_id"})
@@ -319,7 +388,27 @@ func (s *Server) handleUpdateNotificationSettings(c *gin.Context) {
 		return
 	}
 
-	if err := config.UpdateNotificationInFile(s.configPath, tg, fs, qq, wh, barkCfg, em, pp); err != nil {
+	if wxpusher.Enabled && wxpusher.AppToken == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"status": "error", "message": "WxPusher 启用时必须填写 AppToken"})
+		return
+	}
+
+	if wxpusher.Enabled && len(wxpusher.UIDs) == 0 && len(wxpusher.TopicIDs) == 0 {
+		c.JSON(http.StatusBadRequest, gin.H{"status": "error", "message": "WxPusher 启用时至少需要一个 UID 或 Topic ID"})
+		return
+	}
+
+	if serverChan.Enabled && serverChan.SendKey == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"status": "error", "message": "Server 酱启用时必须填写 SendKey"})
+		return
+	}
+
+	if (serverChan.EncryptionPassword == "") != (serverChan.EncryptionUID == "") {
+		c.JSON(http.StatusBadRequest, gin.H{"status": "error", "message": "Server 酱端对端加密的密码和 UID 必须同时填写"})
+		return
+	}
+
+	if err := config.UpdateNotificationInFile(s.configPath, tg, fs, qq, wh, barkCfg, em, pp, wxpusher, serverChan); err != nil {
 		logger.Error("写入通知配置失败", "err", err)
 		c.JSON(http.StatusInternalServerError, gin.H{"status": "error", "message": "写入配置文件失败: " + err.Error()})
 		return
@@ -332,6 +421,8 @@ func (s *Server) handleUpdateNotificationSettings(c *gin.Context) {
 	s.fullCfg.Bark = barkCfg
 	s.fullCfg.Email = em
 	s.fullCfg.Pushplus = pp
+	s.fullCfg.WXPusher = wxpusher
+	s.fullCfg.ServerChan = serverChan
 
 	if s.notifyMgr != nil {
 		if err := s.notifyMgr.UpdateConfig(s.fullCfg); err != nil {
@@ -346,4 +437,30 @@ func (s *Server) handleUpdateNotificationSettings(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, gin.H{"status": "ok", "applied": true})
+}
+
+func normalizeWXPusherUIDs(values []string) []string {
+	result := make([]string, 0, len(values))
+	for _, value := range values {
+		if value = strings.TrimSpace(value); value != "" {
+			result = append(result, value)
+		}
+	}
+	return result
+}
+
+func parseWXPusherTopicIDs(values []string) ([]int64, error) {
+	result := make([]int64, 0, len(values))
+	for _, value := range values {
+		value = strings.TrimSpace(value)
+		if value == "" {
+			continue
+		}
+		id, err := strconv.ParseInt(value, 10, 64)
+		if err != nil || id <= 0 {
+			return nil, fmt.Errorf("WxPusher Topic ID 无效: %q", value)
+		}
+		result = append(result, id)
+	}
+	return result, nil
 }

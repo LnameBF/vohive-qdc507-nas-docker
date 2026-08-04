@@ -75,12 +75,14 @@ type Config struct {
 	QQ       QQConfig       `mapstructure:"qq"`
 	Webhook  WebhookConfig  `mapstructure:"webhook"`
 
-	Bark     BarkConfig     `mapstructure:"bark"`
-	Email    EmailConfig    `mapstructure:"email"`
-	Pushplus PushplusConfig `mapstructure:"pushplus"`
-	Web      WebConfig      `mapstructure:"web"`
-	Proxy    ProxyConfig    `mapstructure:"proxy"`
-	VoWiFi   VoWiFiConfig   `mapstructure:"vowifi"`
+	Bark       BarkConfig       `mapstructure:"bark"`
+	Email      EmailConfig      `mapstructure:"email"`
+	Pushplus   PushplusConfig   `mapstructure:"pushplus"`
+	WXPusher   WXPusherConfig   `mapstructure:"wxpusher"`
+	ServerChan ServerChanConfig `mapstructure:"serverchan"`
+	Web        WebConfig        `mapstructure:"web"`
+	Proxy      ProxyConfig      `mapstructure:"proxy"`
+	VoWiFi     VoWiFiConfig     `mapstructure:"vowifi"`
 }
 
 // ProxyConfig 定义代理服务配置
@@ -359,6 +361,26 @@ type PushplusConfig struct {
 	Channel string `mapstructure:"channel"`
 }
 
+type WXPusherConfig struct {
+	Enabled  bool     `mapstructure:"enabled"`
+	AppToken string   `mapstructure:"app_token"`
+	UIDs     []string `mapstructure:"uids"`
+	TopicIDs []int64  `mapstructure:"topic_ids"`
+}
+
+// ServerChanConfig configures Server 酱³·Turbo notifications.
+// EncryptionPassword and EncryptionUID must be provided together to enable
+// Server 酱's optional end-to-end encryption for message content.
+type ServerChanConfig struct {
+	Enabled            bool   `mapstructure:"enabled"`
+	SendKey            string `mapstructure:"send_key"`
+	Channel            string `mapstructure:"channel"`
+	HideIP             bool   `mapstructure:"hide_ip"`
+	OpenID             string `mapstructure:"openid"`
+	EncryptionPassword string `mapstructure:"encryption_password"`
+	EncryptionUID      string `mapstructure:"encryption_uid"`
+}
+
 func Load(path string) (*Config, error) {
 	if err := migrateLegacyManagedNetworkField(path); err != nil {
 		return nil, err
@@ -382,6 +404,8 @@ func Load(path string) (*Config, error) {
 	viper.SetDefault("email.enabled", false)
 	viper.SetDefault("email.use_ssl", false)
 	viper.SetDefault("pushplus.enabled", false)
+	viper.SetDefault("wxpusher.enabled", false)
+	viper.SetDefault("serverchan.enabled", false)
 	viper.SetDefault("web.username", "admin")
 	viper.SetDefault("web.password", "admin")
 	viper.SetDefault("vowifi.enabled", false)

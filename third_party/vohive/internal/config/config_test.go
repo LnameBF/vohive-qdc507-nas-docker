@@ -205,6 +205,21 @@ webhook:
 		BarkConfig{},
 		EmailConfig{},
 		PushplusConfig{},
+		WXPusherConfig{
+			Enabled:  true,
+			AppToken: "AT_test",
+			UIDs:     []string{"UID_test"},
+			TopicIDs: []int64{123},
+		},
+		ServerChanConfig{
+			Enabled:            true,
+			SendKey:            "SCT_test",
+			Channel:            "9|66",
+			HideIP:             true,
+			OpenID:             "user-1",
+			EncryptionPassword: "password",
+			EncryptionUID:      "227658",
+		},
 	)
 	if err != nil {
 		t.Fatalf("UpdateNotificationInFile() error = %v", err)
@@ -225,6 +240,15 @@ webhook:
 		"text_template:",
 		"{{device_label}}",
 		"{{text}}",
+		"app_token: AT_test",
+		"- UID_test",
+		"- 123",
+		"serverchan:",
+		"send_key: SCT_test",
+		"channel: 9|66",
+		"hide_ip: true",
+		"encryption_uid:",
+		"227658",
 	} {
 		if !strings.Contains(text, want) {
 			t.Fatalf("expected config to contain %q, got:\n%s", want, text)

@@ -8,7 +8,7 @@ import (
 	yaml "gopkg.in/yaml.v3"
 )
 
-func UpdateNotificationInFile(path string, telegram TelegramConfig, feishu FeishuConfig, qq QQConfig, webhook WebhookConfig, bark BarkConfig, email EmailConfig, pushplus PushplusConfig) error {
+func UpdateNotificationInFile(path string, telegram TelegramConfig, feishu FeishuConfig, qq QQConfig, webhook WebhookConfig, bark BarkConfig, email EmailConfig, pushplus PushplusConfig, wxpusher WXPusherConfig, serverChan ServerChanConfig) error {
 	data, err := os.ReadFile(path)
 	if err != nil {
 		return fmt.Errorf("读取配置文件失败: %w", err)
@@ -76,6 +76,23 @@ func UpdateNotificationInFile(path string, telegram TelegramConfig, feishu Feish
 		"token":   pushplus.Token,
 		"topic":   pushplus.Topic,
 		"channel": pushplus.Channel,
+	}
+
+	root["wxpusher"] = map[string]any{
+		"enabled":   wxpusher.Enabled,
+		"app_token": wxpusher.AppToken,
+		"uids":      wxpusher.UIDs,
+		"topic_ids": wxpusher.TopicIDs,
+	}
+
+	root["serverchan"] = map[string]any{
+		"enabled":             serverChan.Enabled,
+		"send_key":            serverChan.SendKey,
+		"channel":             serverChan.Channel,
+		"hide_ip":             serverChan.HideIP,
+		"openid":              serverChan.OpenID,
+		"encryption_password": serverChan.EncryptionPassword,
+		"encryption_uid":      serverChan.EncryptionUID,
 	}
 
 	out, err := yaml.Marshal(root)

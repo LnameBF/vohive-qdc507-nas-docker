@@ -22,8 +22,8 @@
 
 普通绿联 NAS 不需要编译源码，按下面四步即可：
 
-1. 打开 [v0.2.1 发布页](https://github.com/hei85/vohive-qdc507-nas-docker/releases/tag/v0.2.1)。
-2. 下载 `vohive-qdc507-0.2.1-amd64.tar`，在绿联 Docker 的“镜像 → 导入”中导入。
+1. 打开 [v0.2.2 发布页](https://github.com/hei85/vohive-qdc507-nas-docker/releases/tag/v0.2.2)。
+2. 下载 `vohive-qdc507-0.2.2-amd64.tar`，在绿联 Docker 的“镜像 → 导入”中导入。
 3. 下载同一发布页中的 `compose.import.yml`，在“项目 → 创建项目”中导入；如果界面没有文件导入按钮，就把文件内容粘贴到项目编辑框。
 4. 项目显示运行后，在浏览器打开 `http://NAS_IP:7575`。首次登录账号是 `admin`，密码是 `vohive`；登录后立即修改密码。
 
@@ -33,7 +33,7 @@
 
 | 文件 | 用途 | 普通绿联部署是否需要 |
 |---|---|---|
-| `vohive-qdc507-0.2.1-amd64.tar` | 已经构建好的 Docker 镜像 | 需要，导入“镜像” |
+| `vohive-qdc507-0.2.2-amd64.tar` | 已经构建好的 Docker 镜像 | 需要，导入“镜像” |
 | `compose.import.yml` | 使用已导入镜像创建项目 | 需要，创建“项目” |
 | `SHA256SUMS.txt` | 检查镜像下载是否完整 | 可选，不导入 |
 | `compose.yml` | 从源码构建镜像 | 不需要 |
@@ -87,7 +87,7 @@ docker compose -f compose.yml up -d --build
 构建完成后，可执行下面的脚本导出镜像，再将生成的 TAR 导入绿联 NAS：
 
 ```sh
-./scripts/export-image.sh vohive-qdc507-0.2.1-amd64.tar
+./scripts/export-image.sh vohive-qdc507-0.2.2-amd64.tar
 ```
 
 普通绿联 NAS 直接使用发布页的预构建镜像即可，不需要执行源码构建。
@@ -97,11 +97,11 @@ docker compose -f compose.yml up -d --build
 镜像压缩包由 GitHub Actions 自动构建。打一个 `v` 开头的 tag 并推送，会自动构建 amd64 镜像、导出 TAR、计算 SHA256，并发布到该 tag 对应的 GitHub Release：
 
 ```sh
-git tag v0.2.1
-git push origin v0.2.1
+git tag v0.2.2
+git push origin v0.2.2
 ```
 
-Release 资产里会出现 `vohive-qdc507-0.2.1-amd64.tar` 和 `SHA256SUMS.txt`。tag 名会去掉前导 `v` 作为镜像版本号（`v0.2.1` → `0.2.1`），所以导入后镜像名是 `local/vohive-qdc507:0.2.1`。发版前记得同步更新 `compose.import.yml`、`scripts/export-image.sh` 和 `Dockerfile` 里的版本号，避免 tar 与 compose 引用对不上。
+Release 资产里会出现 `vohive-qdc507-0.2.2-amd64.tar` 和 `SHA256SUMS.txt`。tag 名会去掉前导 `v` 作为镜像版本号（`v0.2.2` → `0.2.2`），所以导入后镜像名是 `local/vohive-qdc507:0.2.2`。发版前记得同步更新 `compose.import.yml`、`scripts/export-image.sh` 和 `Dockerfile` 里的版本号，避免 tar 与 compose 引用对不上。
 
 需要在不发版的情况下测试构建时，去 Actions → “Build Docker release image” → Run workflow 手动触发；手动触发的产物只作为 Actions 构件保留 30 天，不会发布到 Release。
 
@@ -115,5 +115,7 @@ Release 资产里会出现 `vohive-qdc507-0.2.1-amd64.tar` 和 `SHA256SUMS.txt`�
 - 使用者应遵守飞行安全、蜂窝通信、频谱、SIM 服务条款和当地法律，不得将本项目用于规避设备限制或进行未授权通信。
 
 ## 项目状态
+
+v0.2.2 修复大疆一代 4G 模块（BAIWANG EG25G-QDC507，USB ID `2ca3:4006`）在多个接口都被 `qmi_wwan` 绑定时错误选择 `.1/cdc-wdm0` 的问题；设备发现现优先使用已验证可用的 `.4/cdc-wdm3`。
 
 v0.2.1 在 v0.2.0 基础上修复了免责声明每次登录重复弹窗的问题（改为服务端持久化：任意设备首次同意后，所有设备不再重复提示），并新增打 `v` tag 自动构建并发 GitHub Release 的工作流；amd64 镜像构建、归档导入与网页启动流程不变。硬件识别与热插拔恢复仍取决于具体 NAS 的 USB 供电、内核驱动和模块状态；遇到设备未识别时，请先按中文指南执行 `verify-qmi` 并查看容器日志。

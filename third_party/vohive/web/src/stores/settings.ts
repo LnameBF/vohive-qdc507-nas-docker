@@ -11,7 +11,9 @@ import {
   type WebhookSettings,
   type BarkSettings,
   type TestBarkResponse,
-  type TestEmailResponse
+  type TestEmailResponse,
+  type ServerChanSettings,
+  type TestServerChanResponse
 } from '../services/system'
 
 const DEFAULT_SYSTEM_INFO: SystemInfo = {
@@ -73,6 +75,15 @@ type PushplusForm = {
   channel: string
 }
 
+type WXPusherForm = {
+  enabled: boolean
+  app_token: string
+  uids: string
+  topic_ids: string
+}
+
+type ServerChanForm = ServerChanSettings
+
 const DEFAULT_PASSWORD_FORM: PasswordForm = {
   old_password: '',
   new_password: '',
@@ -121,6 +132,23 @@ const DEFAULT_PUSHPLUS_FORM: PushplusForm = {
   channel: 'wechat'
 }
 
+const DEFAULT_WXPUSHER_FORM: WXPusherForm = {
+  enabled: false,
+  app_token: '',
+  uids: '',
+  topic_ids: ''
+}
+
+const DEFAULT_SERVERCHAN_FORM: ServerChanForm = {
+  enabled: false,
+  send_key: '',
+  channel: '',
+  hide_ip: false,
+  openid: '',
+  encryption_password: '',
+  encryption_uid: ''
+}
+
 const DEFAULT_WEBHOOK_SETTINGS: WebhookSettings = {
   enabled: false,
   urls: [],
@@ -165,6 +193,8 @@ export const useSettingsStore = defineStore('settings', () => {
   const barkSettings = ref<BarkSettings>({ ...DEFAULT_BARK_SETTINGS })
   const emailForm = ref<EmailForm>({ ...DEFAULT_EMAIL_FORM })
   const pushplusForm = ref<PushplusForm>({ ...DEFAULT_PUSHPLUS_FORM })
+  const wxpusherForm = ref<WXPusherForm>({ ...DEFAULT_WXPUSHER_FORM })
+  const serverChanForm = ref<ServerChanForm>({ ...DEFAULT_SERVERCHAN_FORM })
 
   const loadingSystemInfo = ref(false)
   const loadingNotifications = ref(false)
@@ -172,6 +202,7 @@ export const useSettingsStore = defineStore('settings', () => {
   const testingWebhook = ref(false)
   const testingBark = ref(false)
   const testingEmail = ref(false)
+  const testingServerChan = ref(false)
   const changingPassword = ref(false)
 
   const error = ref<AppError | null>(null)
@@ -254,6 +285,23 @@ export const useSettingsStore = defineStore('settings', () => {
         topic: pushplus.topic || '',
         channel: pushplus.channel || 'wechat'
       }
+      const wxpusher = result.data.wxpusher || {}
+      wxpusherForm.value = {
+        enabled: !!wxpusher.enabled,
+        app_token: wxpusher.app_token || '',
+        uids: Array.isArray(wxpusher.uids) ? wxpusher.uids.join(',') : '',
+        topic_ids: Array.isArray(wxpusher.topic_ids) ? wxpusher.topic_ids.join(',') : ''
+      }
+      const serverChan = result.data.serverchan || {}
+      serverChanForm.value = {
+        enabled: !!serverChan.enabled,
+        send_key: serverChan.send_key || '',
+        channel: serverChan.channel || '',
+        hide_ip: !!serverChan.hide_ip,
+        openid: serverChan.openid || '',
+        encryption_password: serverChan.encryption_password || '',
+        encryption_uid: serverChan.encryption_uid || ''
+      }
       error.value = null
     } else {
       error.value = result.error
@@ -314,6 +362,25 @@ export const useSettingsStore = defineStore('settings', () => {
         token: pushplusForm.value.token || '',
         topic: pushplusForm.value.topic || '',
         channel: pushplusForm.value.channel || ''
+      },
+      wxpusher: {
+        enabled: !!wxpusherForm.value.enabled,
+        app_token: wxpusherForm.value.app_token || '',
+        uids: wxpusherForm.value.uids
+          ? wxpusherForm.value.uids.split(',').map(s => s.trim()).filter(Boolean)
+          : [],
+        topic_ids: wxpusherForm.value.topic_ids
+          ? wxpusherForm.value.topic_ids.split(',').map(s => s.trim()).filter(Boolean)
+          : []
+      },
+      serverchan: {
+        enabled: !!serverChanForm.value.enabled,
+        send_key: String(serverChanForm.value.send_key || '').trim(),
+        channel: String(serverChanForm.value.channel || '').trim(),
+        hide_ip: !!serverChanForm.value.hide_ip,
+        openid: String(serverChanForm.value.openid || '').trim(),
+        encryption_password: String(serverChanForm.value.encryption_password || '').trim(),
+        encryption_uid: String(serverChanForm.value.encryption_uid || '').trim()
       },
       webhook: {
         enabled: !!webhookSettings.value.enabled,
@@ -400,6 +467,24 @@ export const useSettingsStore = defineStore('settings', () => {
     return result as { ok: true; data: TestEmailResponse } | { ok: false; error: AppError }
   }
 
+  async function testServerChanFromForm() {
+    testingServerChan.value = true
+    const result = await systemService.testServerChan({
+      enabled: !!serverChanForm.value.enabled,
+      send_key: String(serverChanForm.value.send_key || '').trim(),
+      channel: String(serverChanForm.value.channel || '').trim(),
+      hide_ip: !!serverChanForm.value.hide_ip,
+      openid: String(serverChanForm.value.openid || '').trim(),
+      encryption_password: String(serverChanForm.value.encryption_password || '').trim(),
+      encryption_uid: String(serverChanForm.value.encryption_uid || '').trim()
+    })
+    if (!result.ok) {
+      error.value = result.error
+    }
+    testingServerChan.value = false
+    return result as { ok: true; data: TestServerChanResponse } | { ok: false; error: AppError }
+  }
+
   async function changePassword(payload: { old_password: string; new_password: string; confirm_password: string }) {
     changingPassword.value = true
     const result = await systemService.changePassword(payload)
@@ -429,12 +514,15 @@ export const useSettingsStore = defineStore('settings', () => {
     barkSettings,
     emailForm,
     pushplusForm,
+    wxpusherForm,
+    serverChanForm,
     loadingSystemInfo,
     loadingNotifications,
     savingNotifications,
     testingWebhook,
     testingBark,
     testingEmail,
+    testingServerChan,
     changingPassword,
     error,
     fetchSystemInfo,
@@ -444,6 +532,7 @@ export const useSettingsStore = defineStore('settings', () => {
     testWebhookFromForm,
     testBarkFromForm,
     testEmailFromForm,
+    testServerChanFromForm,
     changePassword,
     changePasswordFromForm,
     resetPasswordForm

@@ -414,7 +414,7 @@ func detectQMIUSBCapability(scanUSBPath string) (qmiUSBCapability, bool) {
 	if err != nil {
 		return qmiUSBCapability{}, false
 	}
-	sortUSBInterfacePaths(ifaces)
+	prioritizeQMIUSBInterfacePaths(scanUSBPath, ifaces)
 
 	for _, ifPath := range ifaces {
 		driver := determineDriver(ifPath)
@@ -505,6 +505,25 @@ func sortUSBInterfacePaths(paths []string) {
 			return iok
 		}
 		return paths[i] < paths[j]
+	})
+}
+
+func prioritizeQMIUSBInterfacePaths(scanUSBPath string, paths []string) {
+	sortUSBInterfacePaths(paths)
+
+	if readHexFile(filepath.Join(scanUSBPath, "idVendor")) != 0x2ca3 ||
+		readHexFile(filepath.Join(scanUSBPath, "idProduct")) != 0x4006 {
+		return
+	}
+
+	// The BAIWANG EG25G-QDC507 exposes its working QMI control endpoint on
+	// interface 4. Its dynamic qmi_wwan match may also claim interfaces 1-3.
+	sort.SliceStable(paths, func(i, j int) bool {
+		ni, iok := usbInterfaceNumber(paths[i])
+		nj, jok := usbInterfaceNumber(paths[j])
+		iPreferred := iok && ni == 4
+		jPreferred := jok && nj == 4
+		return iPreferred && !jPreferred
 	})
 }
 
