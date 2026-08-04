@@ -82,12 +82,20 @@ export type PushplusSettings = {
   channel: string
 }
 
+export type WXPusherSettings = {
+  enabled: boolean
+  app_token: string
+  uids: string[]
+  topic_ids: number[]
+}
+
 export type NotificationsSettingsResponse = {
   telegram?: Partial<TelegramSettings>
   feishu?: Partial<FeishuSettings>
   qq?: Partial<QQSettings>
   email?: Partial<EmailSettings>
   pushplus?: Partial<PushplusSettings>
+  wxpusher?: Partial<WXPusherSettings>
   webhook?: Partial<WebhookSettings>
   bark?: Partial<BarkSettings>
 }
@@ -129,6 +137,12 @@ export type SaveNotificationsPayload = {
     token: string
     topic: string
     channel: string
+  }
+  wxpusher: {
+    enabled: boolean
+    app_token: string
+    uids: string[]
+    topic_ids: string[]
   }
   webhook: {
     enabled: boolean

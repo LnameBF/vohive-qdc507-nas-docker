@@ -146,6 +146,18 @@ func (m *Manager) initChannels(cfg *config.Config) error {
 		}
 	}
 
+	// WxPusher 渠道
+	if cfg.WXPusher.Enabled {
+		wx, err := NewWXPusherChannel(cfg.WXPusher)
+		if err != nil {
+			logger.Error("初始化 WxPusher 渠道失败", "err", err)
+			return err
+		}
+		if wx != nil {
+			m.channels = append(m.channels, wx)
+		}
+	}
+
 	// 向所有渠道注册命令
 	m.registerCommands()
 

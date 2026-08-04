@@ -73,6 +73,13 @@ type PushplusForm = {
   channel: string
 }
 
+type WXPusherForm = {
+  enabled: boolean
+  app_token: string
+  uids: string
+  topic_ids: string
+}
+
 const DEFAULT_PASSWORD_FORM: PasswordForm = {
   old_password: '',
   new_password: '',
@@ -121,6 +128,13 @@ const DEFAULT_PUSHPLUS_FORM: PushplusForm = {
   channel: 'wechat'
 }
 
+const DEFAULT_WXPUSHER_FORM: WXPusherForm = {
+  enabled: false,
+  app_token: '',
+  uids: '',
+  topic_ids: ''
+}
+
 const DEFAULT_WEBHOOK_SETTINGS: WebhookSettings = {
   enabled: false,
   urls: [],
@@ -165,6 +179,7 @@ export const useSettingsStore = defineStore('settings', () => {
   const barkSettings = ref<BarkSettings>({ ...DEFAULT_BARK_SETTINGS })
   const emailForm = ref<EmailForm>({ ...DEFAULT_EMAIL_FORM })
   const pushplusForm = ref<PushplusForm>({ ...DEFAULT_PUSHPLUS_FORM })
+  const wxpusherForm = ref<WXPusherForm>({ ...DEFAULT_WXPUSHER_FORM })
 
   const loadingSystemInfo = ref(false)
   const loadingNotifications = ref(false)
@@ -254,6 +269,13 @@ export const useSettingsStore = defineStore('settings', () => {
         topic: pushplus.topic || '',
         channel: pushplus.channel || 'wechat'
       }
+      const wxpusher = result.data.wxpusher || {}
+      wxpusherForm.value = {
+        enabled: !!wxpusher.enabled,
+        app_token: wxpusher.app_token || '',
+        uids: Array.isArray(wxpusher.uids) ? wxpusher.uids.join(',') : '',
+        topic_ids: Array.isArray(wxpusher.topic_ids) ? wxpusher.topic_ids.join(',') : ''
+      }
       error.value = null
     } else {
       error.value = result.error
@@ -314,6 +336,16 @@ export const useSettingsStore = defineStore('settings', () => {
         token: pushplusForm.value.token || '',
         topic: pushplusForm.value.topic || '',
         channel: pushplusForm.value.channel || ''
+      },
+      wxpusher: {
+        enabled: !!wxpusherForm.value.enabled,
+        app_token: wxpusherForm.value.app_token || '',
+        uids: wxpusherForm.value.uids
+          ? wxpusherForm.value.uids.split(',').map(s => s.trim()).filter(Boolean)
+          : [],
+        topic_ids: wxpusherForm.value.topic_ids
+          ? wxpusherForm.value.topic_ids.split(',').map(s => s.trim()).filter(Boolean)
+          : []
       },
       webhook: {
         enabled: !!webhookSettings.value.enabled,
@@ -429,6 +461,7 @@ export const useSettingsStore = defineStore('settings', () => {
     barkSettings,
     emailForm,
     pushplusForm,
+    wxpusherForm,
     loadingSystemInfo,
     loadingNotifications,
     savingNotifications,

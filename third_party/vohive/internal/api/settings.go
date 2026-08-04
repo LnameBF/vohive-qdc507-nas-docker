@@ -1,7 +1,9 @@
 package api
 
 import (
+	"fmt"
 	"net/http"
+	"strconv"
 	"strings"
 
 	"github.com/iniwex5/vohive/internal/config"
@@ -69,6 +71,12 @@ type notificationSettingsResponse struct {
 		Topic   string `json:"topic"`
 		Channel string `json:"channel"`
 	} `json:"pushplus"`
+	WXPusher struct {
+		Enabled  bool     `json:"enabled"`
+		AppToken string   `json:"app_token"`
+		UIDs     []string `json:"uids"`
+		TopicIDs []int64  `json:"topic_ids"`
+	} `json:"wxpusher"`
 }
 
 type updateNotificationSettingsRequest struct {
@@ -126,6 +134,12 @@ type updateNotificationSettingsRequest struct {
 		Topic   string `json:"topic"`
 		Channel string `json:"channel"`
 	} `json:"pushplus"`
+	WXPusher struct {
+		Enabled  bool     `json:"enabled"`
+		AppToken string   `json:"app_token"`
+		UIDs     []string `json:"uids"`
+		TopicIDs []string `json:"topic_ids"`
+	} `json:"wxpusher"`
 }
 
 func (s *Server) handleGetNotificationSettings(c *gin.Context) {
@@ -174,6 +188,11 @@ func (s *Server) handleGetNotificationSettings(c *gin.Context) {
 	resp.Pushplus.Token = s.fullCfg.Pushplus.Token
 	resp.Pushplus.Topic = s.fullCfg.Pushplus.Topic
 	resp.Pushplus.Channel = s.fullCfg.Pushplus.Channel
+
+	resp.WXPusher.Enabled = s.fullCfg.WXPusher.Enabled
+	resp.WXPusher.AppToken = s.fullCfg.WXPusher.AppToken
+	resp.WXPusher.UIDs = append([]string(nil), s.fullCfg.WXPusher.UIDs...)
+	resp.WXPusher.TopicIDs = append([]int64(nil), s.fullCfg.WXPusher.TopicIDs...)
 
 	c.JSON(http.StatusOK, resp)
 }
@@ -278,6 +297,21 @@ func (s *Server) handleUpdateNotificationSettings(c *gin.Context) {
 		Channel: strings.TrimSpace(req.Pushplus.Channel),
 	}
 
+	wxpusherTopicIDs, err := parseWXPusherTopicIDs(req.WXPusher.TopicIDs)
+	if err != nil && req.WXPusher.Enabled {
+		c.JSON(http.StatusBadRequest, gin.H{"status": "error", "message": err.Error()})
+		return
+	}
+	if err != nil {
+		wxpusherTopicIDs = nil
+	}
+	wxpusher := config.WXPusherConfig{
+		Enabled:  req.WXPusher.Enabled,
+		AppToken: strings.TrimSpace(req.WXPusher.AppToken),
+		UIDs:     normalizeWXPusherUIDs(req.WXPusher.UIDs),
+		TopicIDs: wxpusherTopicIDs,
+	}
+
 	if tg.Enabled {
 		if tg.BotToken == "" || tg.ChatID == 0 {
 			c.JSON(http.StatusBadRequest, gin.H{"status": "error", "message": "Telegram 启用时必须填写 bot_token 与 chat_id"})
@@ -319,7 +353,17 @@ func (s *Server) handleUpdateNotificationSettings(c *gin.Context) {
 		return
 	}
 
-	if err := config.UpdateNotificationInFile(s.configPath, tg, fs, qq, wh, barkCfg, em, pp); err != nil {
+	if wxpusher.Enabled && wxpusher.AppToken == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"status": "error", "message": "WxPusher 启用时必须填写 AppToken"})
+		return
+	}
+
+	if wxpusher.Enabled && len(wxpusher.UIDs) == 0 && len(wxpusher.TopicIDs) == 0 {
+		c.JSON(http.StatusBadRequest, gin.H{"status": "error", "message": "WxPusher 启用时至少需要一个 UID 或 Topic ID"})
+		return
+	}
+
+	if err := config.UpdateNotificationInFile(s.configPath, tg, fs, qq, wh, barkCfg, em, pp, wxpusher); err != nil {
 		logger.Error("写入通知配置失败", "err", err)
 		c.JSON(http.StatusInternalServerError, gin.H{"status": "error", "message": "写入配置文件失败: " + err.Error()})
 		return
@@ -332,6 +376,7 @@ func (s *Server) handleUpdateNotificationSettings(c *gin.Context) {
 	s.fullCfg.Bark = barkCfg
 	s.fullCfg.Email = em
 	s.fullCfg.Pushplus = pp
+	s.fullCfg.WXPusher = wxpusher
 
 	if s.notifyMgr != nil {
 		if err := s.notifyMgr.UpdateConfig(s.fullCfg); err != nil {
@@ -346,4 +391,30 @@ func (s *Server) handleUpdateNotificationSettings(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, gin.H{"status": "ok", "applied": true})
+}
+
+func normalizeWXPusherUIDs(values []string) []string {
+	result := make([]string, 0, len(values))
+	for _, value := range values {
+		if value = strings.TrimSpace(value); value != "" {
+			result = append(result, value)
+		}
+	}
+	return result
+}
+
+func parseWXPusherTopicIDs(values []string) ([]int64, error) {
+	result := make([]int64, 0, len(values))
+	for _, value := range values {
+		value = strings.TrimSpace(value)
+		if value == "" {
+			continue
+		}
+		id, err := strconv.ParseInt(value, 10, 64)
+		if err != nil || id <= 0 {
+			return nil, fmt.Errorf("WxPusher Topic ID 无效: %q", value)
+		}
+		result = append(result, id)
+	}
+	return result, nil
 }

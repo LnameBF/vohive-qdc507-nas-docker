@@ -78,6 +78,7 @@ type Config struct {
 	Bark     BarkConfig     `mapstructure:"bark"`
 	Email    EmailConfig    `mapstructure:"email"`
 	Pushplus PushplusConfig `mapstructure:"pushplus"`
+	WXPusher WXPusherConfig `mapstructure:"wxpusher"`
 	Web      WebConfig      `mapstructure:"web"`
 	Proxy    ProxyConfig    `mapstructure:"proxy"`
 	VoWiFi   VoWiFiConfig   `mapstructure:"vowifi"`
@@ -359,6 +360,13 @@ type PushplusConfig struct {
 	Channel string `mapstructure:"channel"`
 }
 
+type WXPusherConfig struct {
+	Enabled  bool     `mapstructure:"enabled"`
+	AppToken string   `mapstructure:"app_token"`
+	UIDs     []string `mapstructure:"uids"`
+	TopicIDs []int64  `mapstructure:"topic_ids"`
+}
+
 func Load(path string) (*Config, error) {
 	if err := migrateLegacyManagedNetworkField(path); err != nil {
 		return nil, err
@@ -382,6 +390,7 @@ func Load(path string) (*Config, error) {
 	viper.SetDefault("email.enabled", false)
 	viper.SetDefault("email.use_ssl", false)
 	viper.SetDefault("pushplus.enabled", false)
+	viper.SetDefault("wxpusher.enabled", false)
 	viper.SetDefault("web.username", "admin")
 	viper.SetDefault("web.password", "admin")
 	viper.SetDefault("vowifi.enabled", false)

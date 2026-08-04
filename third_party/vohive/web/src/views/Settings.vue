@@ -16,7 +16,7 @@ import {
 } from '@vicons/fluent'
 
 const settingsStore = useSettingsStore()
-const { systemInfo, loadingNotifications, savingNotifications, testingWebhook, testingBark, testingEmail, changingPassword, passwordForm, telegramForm, feishuForm, qqForm, webhookSettings, barkSettings, emailForm, pushplusForm } = storeToRefs(settingsStore)
+const { systemInfo, loadingNotifications, savingNotifications, testingWebhook, testingBark, testingEmail, changingPassword, passwordForm, telegramForm, feishuForm, qqForm, webhookSettings, barkSettings, emailForm, pushplusForm, wxpusherForm } = storeToRefs(settingsStore)
 const activeNotifyTab = ref('telegram')
 
 
@@ -439,7 +439,7 @@ onBeforeUnmount(() => {
                </div>
                <div>
                   <h3 class="text-lg font-bold text-gray-800 dark:text-gray-100">通知</h3>
-                  <p class="text-xs text-gray-500">Telegram / 飞书 / QQ / Webhook</p>
+                  <p class="text-xs text-gray-500">Telegram / 飞书 / QQ / WxPusher / Webhook</p>
                </div>
             </div>
             <el-button type="primary" :loading="savingNotifications" :disabled="loadingNotifications" @click="saveNotifications" class="!border-0">
@@ -715,6 +715,37 @@ onBeforeUnmount(() => {
                       <el-option label="企业微信 (cp)" value="cp" />
                       <el-option label="邮件 (mail)" value="mail" />
                     </el-select>
+                  </div>
+                </div>
+              </el-tab-pane>
+
+              <!-- WxPusher -->
+              <el-tab-pane label="WxPusher" name="wxpusher" class="pt-2">
+                <div class="flex items-center justify-between mb-4">
+                  <div class="flex items-center gap-2">
+                    <div class="font-bold text-gray-800 dark:text-gray-100">启用 WxPusher 推送</div>
+                  </div>
+                  <el-switch v-model="wxpusherForm.enabled" />
+                </div>
+
+                <div class="space-y-4">
+                  <div class="space-y-1">
+                    <label class="text-xs font-bold text-gray-500 uppercase tracking-wider">AppToken</label>
+                    <el-input v-model="wxpusherForm.app_token" :disabled="!wxpusherForm.enabled" type="password" show-password placeholder="AT_xxx" />
+                    <div class="text-[10px] text-gray-400 mt-1">在 WxPusher 管理后台创建标准推送应用后获取。</div>
+                  </div>
+                  <div class="space-y-1">
+                    <label class="text-xs font-bold text-gray-500 uppercase tracking-wider">UIDs</label>
+                    <el-input v-model="wxpusherForm.uids" :disabled="!wxpusherForm.enabled" placeholder="UID_xxx,UID_yyy" />
+                    <div class="text-[10px] text-gray-400 mt-1">接收用户 UID，多个 UID 用英文逗号分隔。</div>
+                  </div>
+                  <div class="space-y-1">
+                    <label class="text-xs font-bold text-gray-500 uppercase tracking-wider">Topic IDs（可选）</label>
+                    <el-input v-model="wxpusherForm.topic_ids" :disabled="!wxpusherForm.enabled" placeholder="123,456" />
+                    <div class="text-[10px] text-gray-400 mt-1">主题订阅者群发目标，多个 Topic ID 用英文逗号分隔。UID 和 Topic ID 至少填写一项，可同时使用。</div>
+                  </div>
+                  <div class="p-3 rounded-xl bg-blue-50/50 dark:bg-blue-500/5 text-xs text-blue-600 dark:text-blue-400/80 leading-relaxed border border-blue-100/50 dark:border-blue-500/10">
+                    使用标准推送：通知正文以 Markdown 发送。请在 <a href="https://wxpusher.zjiecode.com/docs/api-reference.html" target="_blank" rel="noopener noreferrer" class="underline hover:text-blue-700">WxPusher 标准推送文档</a> 中创建应用并获取 AppToken、UID 或 Topic ID。
                   </div>
                 </div>
               </el-tab-pane>
